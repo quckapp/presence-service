@@ -9,7 +9,7 @@ config :presence_service, PresenceService.Endpoint,
   live_view: [signing_salt: "presence_salt"]
 
 config :presence_service, :mongodb,
-  url: System.get_env("MONGODB_URI") || "mongodb://localhost:27017/quckchat_presence",
+  url: System.get_env("MONGODB_URI") || "mongodb://localhost:27017/quckapp_presence",
   pool_size: 10
 
 config :presence_service, :redis,
@@ -22,7 +22,7 @@ config :presence_service, :kafka,
   consumer_group: "presence-service-group"
 
 config :presence_service, PresenceService.Guardian,
-  issuer: "quckchat",
+  issuer: "quckapp",
   secret_key: System.get_env("JWT_SECRET") || "your-secret-key"
 
 config :libcluster, topologies: [presence_cluster: [strategy: Cluster.Strategy.Gossip]]

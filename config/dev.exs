@@ -5,7 +5,7 @@ config :presence_service, PresenceService.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "dev_secret_key_base_presence_service_quckchat_2024",
+  secret_key_base: "dev_secret_key_base_presence_service_quckapp_2024",
   watchers: []
 
 config :presence_service, dev_routes: true
