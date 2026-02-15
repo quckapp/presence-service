@@ -10,12 +10,27 @@ defmodule PresenceService.RedisClient do
 
   @impl true
   def init(_) do
-    redis_url = Application.get_env(:presence_service, :redis)[:url]
+    redis_config = Application.get_env(:presence_service, :redis, [])
+
+    # Build Redix options from config
+    redix_opts = [
+      host: redis_config[:host] || "localhost",
+      port: redis_config[:port] || 6379,
+      database: redis_config[:database] || 3
+    ]
+
+    # Add password if configured
+    redix_opts = if redis_config[:password] do
+      Keyword.put(redix_opts, :password, redis_config[:password])
+    else
+      redix_opts
+    end
 
     children =
       for i <- 0..(@pool_size - 1) do
+        opts = Keyword.put(redix_opts, :name, :"redix_#{i}")
         Supervisor.child_spec(
-          {Redix, {redis_url, [name: :"redix_#{i}"]}},
+          {Redix, opts},
           id: {Redix, i}
         )
       end

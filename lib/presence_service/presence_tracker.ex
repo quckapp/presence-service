@@ -2,7 +2,7 @@ defmodule PresenceService.PresenceTracker do
   use GenServer
   require Logger
 
-  alias PresenceService.{Repo, RedisClient}
+  alias PresenceService.{Repo, RedisClient, PresenceCounter}
   alias Phoenix.PubSub
 
   @heartbeat_timeout 60_000  # 60 seconds
@@ -78,6 +78,21 @@ defmodule PresenceService.PresenceTracker do
     Repo.get_workspace_presence(workspace_id)
   end
 
+  @doc """
+  Get approximate online count for a workspace using HyperLogLog.
+  This is O(1) instead of O(n) for counting all online users.
+  """
+  def online_count(workspace_id) do
+    PresenceCounter.online_count(workspace_id)
+  end
+
+  @doc """
+  Get approximate online counts for multiple workspaces.
+  """
+  def batch_online_counts(workspace_ids) do
+    PresenceCounter.batch_online_counts(workspace_ids)
+  end
+
   # GenServer callbacks
   @impl true
   def handle_cast({:heartbeat, user_id, workspace_id, metadata}, state) do
@@ -95,6 +110,9 @@ defmodule PresenceService.PresenceTracker do
 
     # Update Redis cache
     RedisClient.set_presence(user_id, presence_data["status"])
+
+    # Update HyperLogLog counter for O(1) online counts
+    PresenceCounter.add_online_user(workspace_id, user_id)
 
     # Update MongoDB
     Repo.update_presence(user_id, presence_data)

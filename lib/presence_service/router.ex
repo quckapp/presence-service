@@ -2,6 +2,7 @@ defmodule PresenceService.Router do
   use Phoenix.Router
   import Plug.Conn
   import Phoenix.Controller
+  alias OpenApiSpex.Operation
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -10,6 +11,23 @@ defmodule PresenceService.Router do
 
   pipeline :public do
     plug :accepts, ["json"]
+  end
+
+  pipeline :browser do
+    plug :accepts, ["html", "json"]
+  end
+
+  # Swagger UI routes
+  scope "/" do
+    pipe_through :browser
+
+    get "/swagger", PresenceService.SwaggerController, :index
+  end
+
+  scope "/api" do
+    pipe_through :public
+
+    get "/openapi", PresenceService.SwaggerController, :openapi
   end
 
   scope "/api/v1/presence", PresenceService do

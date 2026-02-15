@@ -7,6 +7,9 @@ defmodule PresenceService.Application do
 
   @impl true
   def start(_type, _args) do
+    # Initialize circuit breakers
+    PresenceService.CircuitBreaker.init()
+
     children = [
       # Telemetry Supervisor
       PresenceService.Telemetry,
@@ -18,21 +21,32 @@ defmodule PresenceService.Application do
         url: Application.get_env(:presence_service, :mongodb)[:url],
         pool_size: Application.get_env(:presence_service, :mongodb)[:pool_size] || 10
       ]},
-      # Redis Connection Pool
+      # Redis Connection Pool (main connection)
       {Redix, [
         host: Application.get_env(:presence_service, :redis)[:host],
         port: Application.get_env(:presence_service, :redis)[:port],
+        password: Application.get_env(:presence_service, :redis)[:password],
         database: Application.get_env(:presence_service, :redis)[:database] || 3,
         name: :presence_redis
       ]},
+      # Redis Client with connection pool
+      PresenceService.RedisClient,
       # Horde Distributed Registry for presence tracking
       {Horde.Registry, [name: PresenceService.PresenceRegistry, keys: :unique]},
       # Horde Dynamic Supervisor for user sessions
       {Horde.DynamicSupervisor, [name: PresenceService.PresenceSupervisor, strategy: :one_for_one]},
       # Presence Manager GenServer
       PresenceService.PresenceManager,
+      # Presence Tracker GenServer
+      PresenceService.PresenceTracker,
+      # HyperLogLog-based presence counter
+      PresenceService.PresenceCounter,
+      # Bloom filter for fast membership checks
+      PresenceService.BloomFilter,
       # Kafka Consumer for presence events
       PresenceService.Kafka.Consumer,
+      # Kafka Producer for presence events
+      PresenceService.Kafka.Producer,
       # Cluster Manager
       {Cluster.Supervisor, [
         Application.get_env(:libcluster, :topologies),
