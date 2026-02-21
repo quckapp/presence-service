@@ -17,7 +17,7 @@ defmodule PresenceService.PresenceManager do
   end
 
   @doc "Set user presence status"
-  def set_presence(user_id, status, metadata \ %{}) when status in @status_types do
+  def set_presence(user_id, status, metadata \\ %{}) when status in @status_types do
     GenServer.call(__MODULE__, {:set_presence, user_id, status, metadata})
   end
 

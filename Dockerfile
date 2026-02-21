@@ -6,7 +6,7 @@ WORKDIR /app
 
 ENV MIX_ENV=prod
 
-COPY mix.exs mix.lock ./
+COPY mix.exs ./
 RUN mix local.hex --force && mix local.rebar --force
 RUN mix deps.get --only prod
 RUN mix deps.compile

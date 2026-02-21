@@ -19,12 +19,16 @@ defmodule PresenceService.Application do
         pool_size: Application.get_env(:presence_service, :mongodb)[:pool_size] || 10
       ]},
       # Redis Connection Pool
-      {Redix, [
-        host: Application.get_env(:presence_service, :redis)[:host],
-        port: Application.get_env(:presence_service, :redis)[:port],
-        database: Application.get_env(:presence_service, :redis)[:database] || 3,
-        name: :presence_redis
-      ]},
+      {Redix,
+        [
+          host: Application.get_env(:presence_service, :redis)[:host],
+          port: Application.get_env(:presence_service, :redis)[:port],
+          database: Application.get_env(:presence_service, :redis)[:database] || 3,
+          name: :presence_redis
+        ] ++ if(Application.get_env(:presence_service, :redis)[:password],
+          do: [password: Application.get_env(:presence_service, :redis)[:password]],
+          else: []
+        )},
       # Horde Distributed Registry for presence tracking
       {Horde.Registry, [name: PresenceService.PresenceRegistry, keys: :unique]},
       # Horde Dynamic Supervisor for user sessions

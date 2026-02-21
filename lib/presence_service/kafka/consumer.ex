@@ -1,17 +1,12 @@
 defmodule PresenceService.Kafka.Consumer do
   @moduledoc "Kafka consumer for presence events from other services"
-  use GenServer
+  @behaviour :brod_group_subscriber
   require Logger
 
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, [], name: __MODULE__)
-  end
-
-  @impl true
-  def init(_opts) do
     config = Application.get_env(:presence_service, :kafka)
-    brokers = config[:brokers] |> Enum.map(&parse_broker/1)
-    group_id = config[:consumer_group]
+    brokers = (config[:brokers] || ["localhost:9092"]) |> Enum.map(&parse_broker/1)
+    group_id = config[:consumer_group] || "presence-service-group"
 
     group_config = [
       offset_commit_policy: :commit_to_kafka_v2,
@@ -20,29 +15,52 @@ defmodule PresenceService.Kafka.Consumer do
 
     topics = ["user-events", "connection-events"]
 
-    case :brod.start_link_group_subscriber(
-      :presence_consumer,
-      brokers,
-      group_id,
-      topics,
-      group_config,
-      __MODULE__,
-      []
-    ) do
-      {:ok, pid} ->
-        Logger.info("Kafka consumer started successfully")
-        {:ok, %{consumer_pid: pid}}
+    case :brod.start_client(brokers, :presence_consumer, _client_config = []) do
+      :ok -> :ok
+      {:error, {:already_started, _}} -> :ok
       {:error, reason} ->
-        Logger.warning("Kafka consumer failed to start: #{inspect(reason)}")
-        {:ok, %{consumer_pid: nil}}
+        Logger.warning("Kafka client failed to start: #{inspect(reason)}")
+        :ignore
+    end
+    |> case do
+      :ok ->
+        :brod.start_link_group_subscriber(
+          :presence_consumer,
+          group_id,
+          topics,
+          group_config,
+          _consumer_config = [begin_offset: :latest],
+          __MODULE__,
+          _cb_init_arg = []
+        )
+      :ignore -> :ignore
     end
   end
 
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent
+    }
+  end
+
+  @impl :brod_group_subscriber
+  def init(_group_id, _cb_init_arg) do
+    Logger.info("Kafka consumer started successfully")
+    {:ok, %{}}
+  end
+
+  @impl :brod_group_subscriber
   def handle_message(_topic, _partition, message, state) do
-    case Jason.decode(message.value) do
+    value = :brod.message_value(message)
+
+    case Jason.decode(value) do
       {:ok, event} -> process_event(event)
       {:error, _} -> Logger.warning("Invalid JSON in Kafka message")
     end
+
     {:ok, :ack, state}
   end
 
@@ -68,5 +86,6 @@ defmodule PresenceService.Kafka.Consumer do
     [host, port] = String.split(broker, ":")
     {host, String.to_integer(port)}
   end
+
   defp parse_broker({host, port}), do: {host, port}
 end

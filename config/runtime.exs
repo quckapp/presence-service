@@ -20,7 +20,8 @@ if config_env() == :prod do
     password: System.get_env("REDIS_PASSWORD")
 
   config :presence_service, :kafka,
-    brokers: String.split(System.get_env("KAFKA_BROKERS") || "localhost:9092", ",")
+    brokers: String.split(System.get_env("KAFKA_BROKERS") || "localhost:9092", ","),
+    consumer_group: "presence-service-group"
 
   config :presence_service, PresenceService.Guardian,
     secret_key: System.get_env("JWT_SECRET")
