@@ -7,6 +7,9 @@ defmodule PresenceService.Application do
 
   @impl true
   def start(_type, _args) do
+    # Initialize circuit breakers
+    PresenceService.CircuitBreaker.init()
+
     children = [
       # Telemetry Supervisor
       PresenceService.Telemetry,
@@ -35,8 +38,16 @@ defmodule PresenceService.Application do
       {Horde.DynamicSupervisor, [name: PresenceService.PresenceSupervisor, strategy: :one_for_one]},
       # Presence Manager GenServer
       PresenceService.PresenceManager,
+      # Presence Tracker GenServer
+      PresenceService.PresenceTracker,
+      # HyperLogLog-based presence counter
+      PresenceService.PresenceCounter,
+      # Bloom filter for fast membership checks
+      PresenceService.BloomFilter,
       # Kafka Consumer for presence events
       PresenceService.Kafka.Consumer,
+      # Kafka Producer for presence events
+      PresenceService.Kafka.Producer,
       # Cluster Manager
       {Cluster.Supervisor, [
         Application.get_env(:libcluster, :topologies),

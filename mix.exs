@@ -1,13 +1,15 @@
 defmodule PresenceService.MixProject do
   use Mix.Project
 
+  @production_envs [:prod, :production, :staging, :live, :qa, :uat1, :uat2, :uat3]
+
   def project do
     [
       app: :presence_service,
       version: "1.0.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
-      start_permanent: Mix.env() == :prod,
+      start_permanent: Mix.env() in @production_envs,
       aliases: aliases(),
       deps: deps(),
       releases: [
@@ -38,6 +40,7 @@ defmodule PresenceService.MixProject do
       {:jason, "~> 1.4"},
       {:cors_plug, "~> 3.0"},
       {:mongodb_driver, "~> 1.4"},
+      {:castore, "~> 1.0"},
       {:redix, "~> 1.3"},
       {:phoenix_pubsub_redis, "~> 3.0"},
       {:brod, "~> 3.16"},
@@ -49,7 +52,16 @@ defmodule PresenceService.MixProject do
       {:horde, "~> 0.9"},
       {:timex, "~> 3.7"},
       {:uuid, "~> 1.1"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:open_api_spex, "~> 3.18"},
+      {:honeydew, "~> 1.5"},
+      {:logster, "~> 1.1"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+
+      # Algorithm libraries
+      {:fuse, "~> 2.5"},
+      {:hypex, "~> 1.1"},
+      {:bloomex, "~> 1.0"}
     ]
   end
 

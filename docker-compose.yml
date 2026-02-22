@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Presence Service - Elixir/Phoenix Application
+  # ===========================================================================
+  presence-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: presence-service
+    ports:
+      - "4000:4000"
+      - "4369:4369"
+    environment:
+      # Application Configuration
+      - MIX_ENV=prod
+      - PHX_SERVER=true
+      - PHX_HOST=localhost
+      - PORT=4000
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-your-super-secret-key-base-at-least-64-characters-long-for-production}
+
+      # MongoDB Configuration
+      - MONGODB_URL=mongodb://mongodb:27017/quckapp_presence
+      - MONGODB_URI=mongodb://mongodb:27017/quckapp_presence
+      - MONGODB_POOL_SIZE=20
+
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379/3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # Kafka Configuration
+      - KAFKA_BROKERS=kafka:9092
+
+      # Auth Service Configuration
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+
+      # Erlang Distribution
+      - RELEASE_NODE=presence_service@presence-service
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_COOKIE=${RELEASE_COOKIE:-presence_service_cookie}
+
+      # Cluster Configuration
+      - CLUSTER_STRATEGY=gossip
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================================================
+  # MongoDB - Document Database
+  # ===========================================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: presence-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=quckapp_presence
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - quckapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ===========================================================================
+  # Redis - In-Memory Data Store
+  # ===========================================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: presence-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - quckapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ===========================================================================
+  # Zookeeper - Kafka Dependency
+  # ===========================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: presence-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      - quckapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ===========================================================================
+  # Kafka - Message Broker
+  # ===========================================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: presence-kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  quckapp-network:
+    name: quckapp-network
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  mongodb_data:
+    name: presence-mongodb-data
+  mongodb_config:
+    name: presence-mongodb-config
+  redis_data:
+    name: presence-redis-data
+  zookeeper_data:
+    name: presence-zookeeper-data
+  zookeeper_log:
+    name: presence-zookeeper-log
+  kafka_data:
+    name: presence-kafka-data

@@ -18,7 +18,8 @@ config :presence_service, :redis,
   database: 3
 
 config :presence_service, :kafka,
-  brokers: [System.get_env("KAFKA_BROKER") || "localhost:9092"],
+  enabled: false,
+  brokers: [{~c"localhost", 9092}],
   consumer_group: "presence-service-group"
 
 config :presence_service, PresenceService.Guardian,
@@ -30,4 +31,8 @@ config :libcluster, topologies: [presence_cluster: [strategy: Cluster.Strategy.G
 config :logger, :console, format: "$time $metadata[$level] $message\n", metadata: [:request_id, :user_id]
 config :phoenix, :json_library, Jason
 
-import_config "#{config_env()}.exs"
+# Import environment-specific config
+# Environments: dev, test, local, qa, uat1, uat2, uat3, staging, production, live, prod
+if File.exists?("config/#{config_env()}.exs") do
+  import_config "#{config_env()}.exs"
+end
